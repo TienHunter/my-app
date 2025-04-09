@@ -21,6 +21,7 @@ export class PopupVideoComponent implements AfterViewInit, OnDestroy {
   currentTime: number = 0;
   private subscriptionTime!: Subscription; // Lưu subscription
   private subscriptionURL!: Subscription; // Lưu subscription
+  intervalId: any = null; // Lưu intervalId để có thể clear sau này
   constructor(private videoService: VideoPlayerService,
     private cdr: ChangeDetectorRef,
     private sanitizer: DomSanitizer
@@ -35,7 +36,6 @@ export class PopupVideoComponent implements AfterViewInit, OnDestroy {
         this.videoId = id;
         this.videoType = type;
         console.log("popup video", this.videoId, this.videoType);
-        this.cdr.detectChanges();
 
         this.loadPopupPlayer();
       }
@@ -45,19 +45,32 @@ export class PopupVideoComponent implements AfterViewInit, OnDestroy {
       console.log("popup video currentTime", time);
       this.currentTime = time;
     });
+    this.videoService.changeState$.subscribe(isShow => {
+      if (isShow) {
+        this.loadPopupPlayer();
+      }
+
+
+    })
   }
 
   loadPopupPlayer() {
     if (this.videoType === 'youtube') {
       this.initYouTubePopupPlayer();
     } else if (this.videoType === 'vimeo') {
-      this.initVimeoPopupPlayer();
+      // this.initVimeoPopupPlayer();
     }
   }
 
   initYouTubePopupPlayer() {
+    this.cdr.detectChanges();
+    clearInterval(this.intervalId);
+    if (this.player) this.player.destroy();
+
     this.player = new YT.Player('main-video', {
       videoId: this.videoId,
+      height: "600px",
+      width: "800px",
       events: {
         'onReady': (event: any) => {
           if (event.target && typeof event.target.seekTo === 'function') {
@@ -69,14 +82,16 @@ export class PopupVideoComponent implements AfterViewInit, OnDestroy {
         },
         'onStateChange': (event: any) => {
           if (event.data === YT.PlayerState.PLAYING) {
-            const intervalId = setInterval(() => {
+            clearInterval(this.intervalId);
+
+            this.intervalId = setInterval(() => {
               if (event.target && typeof event.target.getCurrentTime === 'function') {
-                console.log("getCurrentTime", event.target.getCurrentTime());
+                console.log("interval popup", event.target.getCurrentTime());
 
                 this.videoService.setVideoTime(event.target.getCurrentTime());
               } else {
                 console.error('Unable to retrieve current time from YouTube Player.');
-                clearInterval(intervalId);
+                clearInterval(this.intervalId); // Clear interval if unable to retrieve time
               }
             }, 1000);
           }
@@ -85,38 +100,41 @@ export class PopupVideoComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  initVimeoPopupPlayer() {
-    const me = this;
-    this.player = new Vimeo.Player('main-video', {
-      id: this.videoId,
-      loop: false
-    });
-    console.log("Vimeo player", this.currentTime);
+  // initVimeoPopupPlayer() {
+  //   const me = this;
+  //   this.player = new Vimeo.Player('main-video', {
+  //     id: this.videoId,
+  //     loop: false
+  //   });
+  //   console.log("Vimeo player", this.currentTime);
 
-    // Khi player đã sẵn sàng, di chuyển đến thời gian chỉ định và phát
+  //   // Khi player đã sẵn sàng, di chuyển đến thời gian chỉ định và phát
 
-    // Sau khi di chuyển đến thời gian, phát video
-    let intervalId: any = null;
+  //   // Sau khi di chuyển đến thời gian, phát video
+  //   let intervalId: any = null;
 
-    this.player.play().then(() => {
-      console.log('Video đang phát từ thời gian chỉ định');
-      this.player.setCurrentTime(this.currentTime).then(() => { });
-      intervalId = setInterval(() => {
-        this.player.getCurrentTime().then(function (seconds: number) {
-          // `seconds` indicates the current playback position of the video
-          console.log("getCurrentTime", seconds);
-          me.videoService.setVideoTime(seconds);
-        });
-      }, 1000);
-    }).catch((error: any) => {
-      console.error('Lỗi khi phát video: ', error);
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    });
-  }
+  //   this.player.play().then(() => {
+  //     console.log('Video đang phát từ thời gian chỉ định');
+  //     this.player.setCurrentTime(this.currentTime).then(() => { });
+  //     intervalId = setInterval(() => {
+  //       this.player.getCurrentTime().then(function (seconds: number) {
+  //         // `seconds` indicates the current playback position of the video
+  //         console.log("getCurrentTime", seconds);
+  //         me.videoService.setVideoTime(seconds);
+  //       });
+  //     }, 1000);
+  //   }).catch((error: any) => {
+  //     console.error('Lỗi khi phát video: ', error);
+  //     if (intervalId) {
+  //       clearInterval(intervalId);
+  //     }
+  //   });
+  // }
 
   closePopup() {
+    if (this.player) this.player.destroy();
+    clearInterval(this.intervalId);
+
     this.videoService.changeState$.next(false);
   }
 
@@ -124,5 +142,6 @@ export class PopupVideoComponent implements AfterViewInit, OnDestroy {
     if (this.player) this.player.destroy();
     if (this.subscriptionTime) this.subscriptionTime.unsubscribe();
     if (this.subscriptionURL) this.subscriptionURL.unsubscribe();
+    clearInterval(this.intervalId); // Clear interval when component is destroyed
   }
 }

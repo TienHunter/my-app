@@ -21,6 +21,7 @@ export class MinimizeVideoComponent implements AfterViewInit, OnDestroy {
   player: any;
   private subscriptionTime!: Subscription; // Lưu subscription
   private subscriptionURL!: Subscription; // Lưu subscription
+  intervalId: any = null; // Lưu intervalId để có thể clear sau này
 
   constructor(private videoService: VideoPlayerService,
     private cdr: ChangeDetectorRef,
@@ -54,19 +55,23 @@ export class MinimizeVideoComponent implements AfterViewInit, OnDestroy {
     if (this.player) this.player.destroy();
     if (this.subscriptionTime) this.subscriptionTime.unsubscribe();
     if (this.subscriptionURL) this.subscriptionURL.unsubscribe();
+    clearInterval(this.intervalId); // Clear interval when component is destroyed
+
   }
 
   loadMiniPlayer() {
     if (this.videoType === 'youtube') {
       this.initYouTubeMiniPlayer();
     } else if (this.videoType === 'vimeo') {
-      this.initVimeoMiniPlayer();
+      // this.initVimeoMiniPlayer();
     }
   }
 
   initYouTubeMiniPlayer() {
     this.player = new YT.Player('mini-video', {
       videoId: this.videoId,
+      height: "300px",
+      width: "400px",
       events: {
 
         'onReady': (event: any) => {
@@ -79,14 +84,15 @@ export class MinimizeVideoComponent implements AfterViewInit, OnDestroy {
         },
         'onStateChange': (event: any) => {
           if (event.data === YT.PlayerState.PLAYING) {
-            const intervalId = setInterval(() => {
+            clearInterval(this.intervalId);
+            this.intervalId = setInterval(() => {
               if (event.target && typeof event.target.getCurrentTime === 'function') {
-                console.log("getCurrentTime", event.target.getCurrentTime());
+                console.log("interval minize", event.target.getCurrentTime());
 
                 this.videoService.setVideoTime(event.target.getCurrentTime());
               } else {
                 console.error('Unable to retrieve current time from YouTube Player.');
-                clearInterval(intervalId);
+                clearInterval(this.intervalId);
               }
             }, 1000);
           }
@@ -95,37 +101,40 @@ export class MinimizeVideoComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  initVimeoMiniPlayer() {
-    const me = this;
-    this.player = new Vimeo.Player('mini-video', {
-      id: this.videoId,
-      loop: false
-    });
+  // initVimeoMiniPlayer() {
+  //   const me = this;
+  //   this.player = new Vimeo.Player('mini-video', {
+  //     id: this.videoId,
+  //     loop: false
+  //   });
 
-    this.player.ready().then(() => {
-      let intervalId: any = null;
+  //   this.player.ready().then(() => {
+  //     let intervalId: any = null;
 
-      this.player.play().then(() => {
-        console.log('Video đang phát từ thời gian chỉ định');
-        this.player.setCurrentTime(this.currentTime).then(() => { });
-        intervalId = setInterval(() => {
-          this.player.getCurrentTime().then(function (seconds: number) {
-            // `seconds` indicates the current playback position of the video
-            console.log("getCurrentTime", seconds);
-            me.videoService.setVideoTime(seconds);
-          });
-        }, 1000);
-      }).catch((error: any) => {
-        console.error('Lỗi khi phát video: ', error);
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-      });
-    });
+  //     this.player.play().then(() => {
+  //       console.log('Video đang phát từ thời gian chỉ định');
+  //       this.player.setCurrentTime(this.currentTime).then(() => { });
+  //       intervalId = setInterval(() => {
+  //         this.player.getCurrentTime().then(function (seconds: number) {
+  //           // `seconds` indicates the current playback position of the video
+  //           console.log("getCurrentTime", seconds);
+  //           me.videoService.setVideoTime(seconds);
+  //         });
+  //       }, 1000);
+  //     }).catch((error: any) => {
+  //       console.error('Lỗi khi phát video: ', error);
+  //       if (intervalId) {
+  //         clearInterval(intervalId);
+  //       }
+  //     });
+  //   });
 
-  }
+  // }
 
   restorePopup() {
+    if (this.player) this.player.destroy();
+    clearInterval(this.intervalId);
+
     this.videoService.changeState$.next(true);
   }
 }

@@ -2,7 +2,7 @@
    <input type="text" [(ngModel)]="videoUrl" placeholder="Nhập URL YouTube/Vimeo" />
    <button (click)="loadVideo()">Tải Video</button>
 </div>
-<div *ngIf="isShowPopup">
+<div [hidden]="!isShowPopup">
    <app-popup-video></app-popup-video>
 </div>
 <div *ngIf="!isShowPopup">
